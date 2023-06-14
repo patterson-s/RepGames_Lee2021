@@ -16,6 +16,8 @@ The `doStata` package is old and does not appear to be maintained or have much d
 
 Is there a better package that is more commonly used? 
 
+It actually doesn't appear necessary for the project. 
+
 ```{r Library}
 
 pacman::p_load(statar, doStata, tidyverse, stargazer, scales, cowplot, xtable)
@@ -466,6 +468,329 @@ figure4 <- plot_grid(beliefs,prefs,ncol=2,rel_widths  = c(1,1))
 
 
 ```
+
+
+# Supplementals 
+
+```{r}
+### DESCRIPTIVES BY POLICIES
+
+## fig_bias #### ----
+# The following lines of code are preprocessing the dataframe "df" by selecting specific columns, removing rows with NA values, and adding new columns
+results <- df %>%
+  select(bias_num, party_bin, issue) %>%
+  filter(!is.na(issue) & !is.na(bias_num) & !is.na(party_bin)) %>%
+  mutate(party_bin = as.character(ifelse(party_bin == "Republican","Rep. respondents","Dem. respondents")),
+         party_bin = factor(party_bin,levels = c("Rep. respondents","Dem. respondents"))) %>%
+  group_by(party_bin,issue) %>%
+  summarise(mean = mean(bias_num, na.rm = TRUE),
+            sd = sd(bias_num, na.rm = TRUE),
+            n = sum(!is.na(bias_num)))
+
+# Here, the code is calculating standard errors and confidence intervals based on the calculated mean and standard deviation
+results$se = results$sd/sqrt(results$n)
+results$ci = results$se*1.96
+
+# Set the upper and lower limits for the error bars
+limits <- aes(ymax = results$mean + results$ci, ymin=results$mean - results$ci)
+
+# The following lines are creating a bar plot with error bars, and then saving it to a .png file
+ggplot(data=results, aes(fill= party_bin, y=mean, x=issue)) +
+  geom_bar(width = 0.5, position='dodge', stat='identity')+
+  geom_errorbar(aes(ymin=mean - ci,ymax=mean + ci), width=0.15, colour="gray48", position = position_dodge(width = 0.5)) +
+  scale_fill_manual(values = c("firebrick","cornflowerblue"),guide=guide_legend(title=NULL))+
+  theme(plot.title = element_text(hjust = 0.5),legend.position = "none")+
+  xlab('')+ 
+  ylab('')+
+  ggtitle("")+
+  scale_y_continuous(labels = percent) +
+  scale_x_discrete(labels = c("Experts on\nNeedle Exchange","Scientists on\nGMO Ban","Economists on\nRent Control"))+
+  theme(legend.position = "right") + 
+  theme_minimal()+
+  ggsave("Figs/fig_bias.png", unit = "in",width=7.5, height=5,dpi = 600)
+
+## fig_deference #### ----
+# Preprocessing the dataframe "df" by selecting specific columns, removing rows with NA values, and creating and recoding new columns
+results <- df %>%
+  select(deference_num, party_bin, issue) %>%
+  filter(!is.na(issue) & !is.na(deference_num) & !is.na(party_bin)) %>%
+  mutate(party_bin = as.character(ifelse(party_bin == "Republican","Rep. respondents","Dem. respondents")),
+         party_bin = factor(party_bin,levels = c("Rep. respondents","Dem. respondents"))) %>%
+  group_by(party_bin,issue) %>%
+  summarise(mean = mean(deference_num, na.rm = TRUE),
+            sd = sd(deference_num, na.rm = TRUE),
+            n = sum(!is.na(deference_num)))
+
+# Calculating standard errors and confidence intervals based on the calculated mean and standard deviation
+results$se = results$sd/sqrt(results$n)
+results$ci = results$se*1.96
+limits <- aes(ymax = results$mean + results$ci, ymin=results$mean - results$ci)
+
+# Creating a bar plot with error bars, and saving it to a .png file
+ggplot(data=results, aes(fill= party_bin, y=mean, x=issue)) +
+  geom_bar(width = 0.5, position='dodge', stat='identity')+
+  geom_errorbar(aes(ymin=mean - ci,ymax=mean + ci), width=0.15, colour="gray48", position = position_dodge(width = 0.5)) +
+  scale_fill_manual(values = c("firebrick","cornflowerblue"),guide=guide_legend(title=NULL))+
+  theme(plot.title = element_text(hjust = 0.5),legend.position = "none")+
+  xlab('')+ 
+  ylab('')+
+  ggtitle("")+
+  scale_y_continuous(labels = percent) +
+  scale_x_discrete(labels = c("Experts on\nNeedle Exchange","Scientists on\nGMO Ban","Economists on\nRent Control"))+
+  theme(legend.position = "right") + 
+  theme_minimal()+
+  ggsave("Figs/fig_deference.png", unit = "in",width=7.5, height=5,dpi = 600)
+
+### fig_polarity #### ----
+# Preprocessing the dataframe "df" by selecting specific columns, removing rows with NA values, and creating and recoding new columns
+results <- df %>%
+  select(polarization, party_bin, issue) %>%
+  filter(!is.na(issue) & !is.na(polarization) & !is.na(party_bin)) %>%
+  mutate(party_bin = as.character(ifelse(party_bin == "Republican","Rep. respondents","Dem. respondents")),
+         party_bin = factor(party_bin,levels = c("Rep. respondents","Dem. respondents"))) %>%
+  group_by(party_bin,issue) %>%
+  summarise(mean = mean(polarization, na.rm = TRUE),
+            sd = sd(polarization, na.rm = TRUE),
+            n = sum(!is.na(polarization)))
+
+# Calculating standard errors and confidence intervals based on the calculated mean and standard deviation
+results$se = results$sd/sqrt(results$n)
+results$ci = results$se*1.96
+limits <- aes(ymax = results$mean + results$ci, ymin=results$mean - results$ci)
+
+# Creating a bar plot with error bars, and saving it to a .png file
+ggplot(data=results, aes(fill= party_bin, y=mean, x=issue)) +
+  geom_bar(width = 0.5, position='dodge', stat='identity')+
+  geom_errorbar(limits, width=0.3, colour="gray48", position = position_dodge(width = 0.6)) +
+  scale_fill_manual(values = c("firebrick","cornflowerblue"),guide=guide_legend(title=NULL))+
+  theme(plot.title = element_text(hjust = 0.5))+
+  xlab('')+ 
+  ylab('')+
+  theme_minimal()+
+  scale_y_continuous(labels = percent)+ 
+  ggsave("Figs/fig_polarity.png", unit = "in",width=7.5, height=5)
+
+
+```
+
+# Alternate Visualizations
+
+## Issue: this doesn't work; the authors didn't include the "preferences_GMO" variable, which prevents the entire figure. 
+
+```{r}
+
+#fig_levels ----
+
+# Creating a plot for belief accuracy ----
+
+## Policy: Needle Exchange ----
+
+policy <- "Needle Exchange"
+beliefs_NEP <- df %>%
+  filter(survey=="CP18" & issue == policy & policymaker==1 & !is.na(accuracy) & !is.na(party_bin)) %>%
+  select(treated, accuracy) %>%
+  mutate(condition = factor(ifelse(treated == 1, "With expert evidence",
+                                   "Without expert evidence"), 
+                           levels = c("Without expert evidence","With expert evidence"))) %>%
+  group_by(condition) %>%  
+  summarise(count = n(), mean = mean(accuracy),
+            se = sd(accuracy)/sqrt(count), ci = se * 1.96,
+            lower = mean - ci, upper = mean + ci) %>%
+  as.data.frame(.) %>%
+  ggplot() + 
+  aes(x=condition, y=mean, color=condition) + 
+  geom_point(stat='identity', size=0.5, position = position_dodge(width=0.5)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width=0.2, position = position_dodge(width=0.5)) +
+  theme_minimal() +
+  scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), limits=c(0,1),
+                     labels = c("Least accurate \n(<20% experts)", "", "", "", "Most accurate \n(>80% experts)")) +
+  scale_color_manual(name = NULL, 
+                     values = c("Without expert evidence" = "#006600",
+                                "With expert evidence"  = "#660099")) +
+  xlab("") + ylab("Belief") + 
+  ggtitle(policy) +
+  theme(legend.position = "none",
+        axis.text.y = element_text(size=8),
+        axis.title.y = element_text(size=11,vjust = -10,face = 'bold'),
+        axis.text.x = element_blank(),
+        axis.title.x = element_text(size=12),
+        plot.title = element_text(face = 'bold', hjust = 0.5, size=11))
+
+# Creating a plot for preference congruence
+preferences_NEP <-  df %>%
+  filter(survey=="CP18" & issue == policy & policymaker==1 & !is.na(preference) & !is.na(party_bin)) %>%
+  select(party_bin, treated, preference) %>%
+  mutate(condition = factor(ifelse(treated == 1,"With expert evidence",
+                                   "Without expert evidence"), 
+                           levels = c("Without expert evidence","With expert evidence"))) %>%
+  group_by(condition) %>%  
+  summarise(count = n(), mean = mean(preference),
+            se = sd(preference)/sqrt(count), ci = se * 1.96,
+            lower = mean - ci, upper = mean + ci) %>%
+  as.data.frame(.) %>%
+  ggplot() + 
+  aes(x=condition, y=mean, color=condition) + 
+  geom_point(stat='identity', size=0.5, position = position_dodge(width=0.5)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width=0.2, position = position_dodge(width=0.5)) +
+  theme_minimal() +
+  scale_y_continuous(breaks = c(0,1/6,2/6,3/6,4/6,5/6,6/6), limits=c(-0.01,1),
+                     labels = c("Least congruent", "", "", "", "", "", "Most congruent")) +
+  scale_color_manual(name = NULL, 
+                     values = c("Without expert evidence" = "#006600",
+                                "With expert evidence"  = "#660099")) +
+  xlab("") + ylab("Preference") +
+  theme(legend.position = "none",
+        axis.text.y = element_text(size=8),
+        axis.title.y = element_text(size=11, vjust = -10, face = 'bold'),
+        axis.text.x = element_blank(),
+        axis.title.x = element_text(size=12),
+        plot.title = element_text(face = 'bold', hjust = 0.5, size=11))
+
+# Policy: GMO Ban ----
+policy <- "GMO Ban"
+beliefs_GMO <- df %>%
+  filter(survey=="CP18" & issue == policy & policymaker==1 & !is.na(accuracy) & !is.na(party_bin)) %>%
+  select(party_bin, treated, accuracy) %>%
+  mutate(condition = factor(ifelse(treated == 1, "With expert evidence",
+                                   "Without expert evidence"), 
+                           levels = c("Without expert evidence","With expert evidence"))) %>%
+  group_by(condition) %>%
+  summarise(count = n(), mean = mean(accuracy),
+            se = sd(accuracy)/sqrt(count), ci = se * 1.96,
+            lower = mean - ci, upper = mean + ci) %>%
+  ggplot() + 
+  aes(x=condition, y=mean, color=condition) + 
+  geom_point(stat='identity', size=0.5, position = position_dodge(width=0.5)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width=0.2, position = position_dodge(width=0.5)) +
+  theme_minimal() +
+  scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), limits=c(0,1),
+                     labels = c("","","","","")) +
+  scale_color_manual(name = NULL, 
+                     values = c("Without expert evidence" = "#006600",
+                                "With expert evidence"  = "#660099")) +
+  xlab("") + ylab("") + 
+  ggtitle(policy) +
+  theme(legend.position = "none",
+        axis.text.y = element_text(size=8),
+        axis.title.y = element_text(size=10, vjust = -10, face = 'bold'),
+        axis.text.x = element_blank(),
+        axis.title.x = element_text(size=10),
+        plot.title = element_text(face = 'bold', hjust = 0.5, size=11))
+
+
+# Policy: Rent Control ----
+policy <- "Rent Control"
+beliefs_RC <- df %>%
+  filter(survey=="CP18" & issue == policy & policymaker==1 & !is.na(accuracy) & !is.na(party_bin)) %>%
+  select(party_bin, treated, accuracy) %>%
+  mutate(condition = factor(ifelse(treated == 1, "With expert evidence",
+                                   "Without expert evidence"), 
+                           levels = c("Without expert evidence","With expert evidence"))) %>%
+  group_by(condition) %>%
+  summarise(count = n(), mean = mean(accuracy),
+            se = sd(accuracy)/sqrt(count), ci = se * 1.96,
+            lower = mean - ci, upper = mean + ci) %>%
+  ggplot() + 
+  aes(x=condition, y=mean, color=condition) + 
+  geom_point(stat='identity', size=0.5, position = position_dodge(width=0.5)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width=0.2, position = position_dodge(width=0.5)) +
+  theme_minimal() +
+  scale_y_continuous(breaks = c(0,0.25,0.5,0.75,1), limits=c(0,1),
+                     labels = c("","","","","")) +
+  scale_color_manual(name = NULL, 
+                     values = c("Without expert evidence" = "#006600",
+                                "With expert evidence"  = "#660099")) +
+  xlab("") + ylab("") + 
+  ggtitle(policy) +
+  theme(legend.position = "none",
+        axis.text.y = element_text(size=8),
+        axis.title.y = element_text(size=10, vjust = -10, face = 'bold'),
+        axis.text.x = element_blank(),
+        axis.title.x = element_text(size=10),
+        plot.title = element_text(face = 'bold', hjust = 0.5, size=11))
+
+# Combine beliefs plot ----
+# Combine beliefs plots horizontally
+beliefs <- plot_grid(beliefs_NEP, beliefs_GMO, beliefs_RC, nrow=1, rel_widths = c(1.4, 1, 1))
+
+# Combine preferences plots horizontally
+preferences <- plot_grid(preferences_NEP, preferences_GMO, preferences_RC, nrow=1, rel_widths = c(1.4, 1, 1))
+
+# Combine beliefs and preferences plots vertically
+p <- plot_grid(beliefs, preferences, nrow=2, rel_heights = c(1, 0.91))
+
+# Get the legend from beliefs_NEP plot and customize it
+legend <- get_legend(beliefs_NEP + theme(legend.justification = "center",
+                                         legend.text = element_text(size=10),
+                                         legend.background = element_rect(colour = 'white'),
+                                         legend.position = "bottom"))
+
+# Combine the plot and the legend vertically
+final_plot <- plot_grid(p, legend, nrow=2, rel_heights = c(7, 1))
+
+# Print the final plot
+print(final_plot)
+
+
+```
+
+
+# Subsample Analysis (within-subject)
+
+```{r}
+
+# Define the position variable based on the Staffer variable
+panel_stacked$position = ifelse(panel_stacked$Staffer==0,"Elected Official",NA)
+panel_stacked$position = ifelse(panel_stacked$Staffer==1,"Staffer",panel_stacked$position)
+panel_stacked$position = factor(panel_stacked$position,levels = c("Elected Official","Staffer"))
+
+# Create the beliefs data frame by filtering, selecting, and mutating the panel_stacked data frame
+beliefs <-   panel_stacked %>%
+  filter(survey=="CP18"&policymaker==1&!is.na(accuracy)&!is.na(position)) %>%
+  select(position,treated,accuracy)%>%
+  mutate(type = position,
+         condition = factor(ifelse(treated == 1,"With expert evidence",
+                                   "Without expert evidence"), levels = c("Without expert evidence","With expert evidence")))%>%
+  group_by(condition,type) %>%  summarise(. ,count = n(),mean = mean(accuracy),
+                                          se = sd(accuracy)/sqrt(count), ci   = se * 1.96,
+                                          lower = mean - ci,upper = mean + ci)%>%
+  as.data.frame(.)
+# Plot the beliefs data
+
+
+# Create the preferences data frame by filtering, selecting, and mutating the panel_stacked data frame
+preferences <-     panel_stacked %>%
+  filter(survey=="CP18"&policymaker==1&!is.na(preference)&!is.na(position)) %>%
+  select(position,treated,preference)%>%
+  mutate(type = position,
+         condition = factor(ifelse(treated == 1,"With expert evidence",
+                                   "Without expert evidence"), levels = c("Without expert evidence","With expert evidence")))%>%
+  group_by(condition,type) %>%  summarise(. ,count = n(),mean = mean(preference),
+                                          se = sd(preference)/sqrt(count), ci   = se * 1.96,
+                                          lower = mean - ci,upper = mean + ci)%>%
+  as.data.frame(.)
+
+# Plot the preferences data
+
+# Create a grid of the beliefs and preferences plots in a single row
+p <- plot_grid(beliefs, preferences, nrow = 1, rel_widths = c(1.2, 1))
+
+# Extract the legend from the beliefs plot
+legend <- get_legend(beliefs + theme(legend.justification = "center",
+                                     legend.text = element_text(size = 10),
+                                     legend.background = element_rect(colour = 'white'),
+                                     legend.position = "bottom"))
+
+# Add the extracted legend to the combined plot and create a new combined plot with 2 rows
+# The first row contains the original combined plot and the second row contains the legend
+# The relative heights of the rows are set to 7 and 1 respectively
+plot_grid(p, legend, nrow = 2, rel_heights = c(7, 1))
+
+
+
+```
+
+
 
 
 
