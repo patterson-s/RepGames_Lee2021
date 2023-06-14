@@ -220,5 +220,246 @@ figure1 <- ggplot(data=results, aes(fill= party_bin, y=mean, x=issue)) +
 
 ```
 
+# Figure 2
+
+```{r}
+
+# Create linear regression models for each 'issue' type, for both 'accuracy' and 'preference' as response variables
+reg1b <- lm(accuracy ~ treated, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Needle Exchange",])
+reg2b <- lm(accuracy ~ treated, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "GMO Ban",])
+reg3b <- lm(accuracy ~ treated, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Rent Control",])
+reg1p <- lm(preference ~ treated, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Needle Exchange",])
+reg2p <- lm(preference ~ treated, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "GMO Ban",])
+reg3p <- lm(preference ~ treated, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Rent Control",])
+
+# Define function to create a plot of treatment effect
+fig_effect = function(reg_effect, range, ylabel, subtitle, maintitle) {
+  coeffs_effect = as.data.frame(summary(reg_effect)$coefficient)  # get coefficients from the regression model
+  vcov_effect = vcov(reg_effect)  # get variance-covariance matrix from the model
+  results = as.data.frame(matrix(, 1, 3))  # create empty data frame
+  colnames(results) = c("mean", "se", "ci")  # name columns
+  
+  # fill in data frame with coefficients, standard error, and confidence interval
+  results[,"mean"] <- coeffs_effect["treated", "Estimate"]
+  results[,"se"] <- coeffs_effect["treated", "Std. Error"]
+  results$ci <- results$se * 1.96
+  
+  # generate plot with mean treatment effect and confidence intervals
+  p <- ggplot(data = results, aes(y = mean, x = "")) +
+    geom_point(stat = 'identity', size = 0.5) +
+    geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci), width = 0.05) +
+    labs(y = ylabel, subtitle = subtitle, title = maintitle) +
+    geom_hline(yintercept = 0, lty = 3) +
+    theme_minimal() +
+    scale_y_continuous(breaks = c(-0.05, 0, 0.05, 0.1, 0.15, 0.2), limits = range,
+                       labels = c("", "0%-pts", "", "10%-pts", "", "20%-pts")) +
+    theme(legend.position = "none", axis.title.x = element_blank(),
+          plot.subtitle = element_text(face = "plain", size = 9, hjust = 0.5),
+          axis.title.y = element_text(size = 8),
+          axis.text.y = element_text(size = 8),
+          axis.text.x = element_text(size = 9),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(face = 'bold', hjust = 0.5, size = 12))
+  return(p)
+}
+
+# Generate and combine individual plots for beliefs and preferences for each issue
+beliefs = plot_grid(fig_effect(reg1b, range, "Δ Accuracy", "Belief about Experts", "Needle Exchange"),
+                    fig_effect(reg2b, range, "Δ Accuracy", "Belief about Experts", "GMO Ban"),
+                    fig_effect(reg3b, range, "Δ Accuracy", "Belief about Experts", "Rent Control"), ncol = 1)
+
+preference = plot_grid(fig_effect(reg1p, range, "Δ Congruence", "Policy Preference", "Needle Exchange"),
+                       fig_effect(reg2p, range, "Δ Congruence", "Policy Preference", "GMO Ban"),
+                       fig_effect(reg3p, range, "Δ Congruence", "Policy Preference", "Rent Control"), ncol = 1)
+
+# Combine belief and preference plots side-by-side
+p <- plot_grid(beliefs, preference, ncol = 2, rel_widths  = c(1, 1))
+
+figure2 <- p
+
+```
+
+
+# Figure 3
+
+```{r}
+# Define the range for the y-axis in the plots
+range <- c(-.09,.25)
+
+# Create six different regression models for each 'issue' type, for both 'accuracy' and 'preference' as response variables,
+# and also include interaction between 'treated' and 'republican'
+reg1b <- lm(accuracy ~ treated * republican, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Needle Exchange",])
+reg2b <- lm(accuracy ~ treated * republican, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "GMO Ban",])
+reg3b <- lm(accuracy ~ treated * republican, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Rent Control",])
+reg1p <- lm(preference ~ treated * republican, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Needle Exchange",])
+reg2p <- lm(preference ~ treated * republican, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "GMO Ban",])
+reg3p <- lm(preference ~ treated * republican, d = df[df$survey == "CP18" & df$policymaker == 1 & df$issue == "Rent Control",])
+
+# Define function to create a plot for each regression model, including separate effects for Democrats and Republicans
+fig_effects_by_party = function(reg, range, ylabel, subtitle, maintitle) {
+  coeffs = as.data.frame(summary(reg)$coefficient)  # get coefficients from the regression model
+  vcov = vcov(reg)  # get variance-covariance matrix from the model
+  results = as.data.frame(matrix(, 2, 3))  # create empty data frame
+  colnames(results) = c("mean", "se", "ci")  # name columns
+  rownames(results) = c("democrat", "republican")  # name rows
+
+  # fill in data frame with coefficients, standard error, and confidence interval for Democrats and Republicans
+  results["democrat", "mean"] <- coeffs["treated", "Estimate"]
+  results["democrat", "se"] <- coeffs["treated", "Std. Error"]
+  results["republican", "mean"] <- coeffs["treated", "Estimate"] + coeffs["treated:republican", "Estimate"]
+  results["republican", "se"] <- sqrt((vcov["treated:republican", "treated:republican"] + vcov["treated", "treated"] + 2 * vcov["treated", "treated:republican"]))
+  results$ci <- results$se * 1.96
+  results$party = c("democrat", "republican")  # create a new column 'party'
+  results$colour = c("cornflowerblue", "firebrick")  # create a new column 'colour'
+
+  # generate plot with treatment effects and confidence intervals for Democrats and Republicans
+  p <- ggplot(results, aes(y = mean, x = party, range = range, colour = party)) +
+    geom_point(stat = 'identity') +
+    geom_errorbar(aes(ymin = mean - ci, ymax = mean + ci), width = 0.05) +
+    theme_minimal() +
+    labs(y = ylabel, subtitle = subtitle, title = maintitle, x = "") +
+    geom_hline(yintercept = 0, lty = 3) +
+    scale_y_continuous(breaks = c(-0.05, 0, 0.05, 0.1, 0.15, 0.2), limits = range, labels = c("", "0%-pts", "", "10%-pts", "", "20%-pts")) +
+    scale_colour_manual(values = results$colour) +
+    theme(legend.position = "none", axis.title.x = element_blank(),
+          plot.subtitle = element_text(face = "plain", size = 9, hjust = 0.5),
+          axis.title.y = element_text(size = 8),
+          axis.text.y = element_text(size = 8),
+          axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          plot.title = element_text(face = 'bold', hjust = 0.5, size = 12))
+  return(p)
+}
+
+# Generate plots for belief and preference for each issue
+beliefs = plot_grid(fig_effects_by_party(reg1b, range, "Δ Accuracy", "Belief about Experts", "Needle Exchange"),
+                    fig_effects_by_party(reg2b, range, "Δ Accuracy", "Belief about Experts", "GMO Ban"),
+                    fig_effects_by_party(reg3b, range, "Δ Accuracy", "Belief about Experts", "Rent Control"), ncol = 1)
+prefs = plot_grid(fig_effects_by_party(reg1p, range, "Δ Congruence", "Policy Preference", "Needle Exchange"),
+                  fig_effects_by_party(reg2p, range, "Δ Congruence", "Policy Preference", "GMO Ban"),
+                  fig_effects_by_party(reg3p, range, "Δ Congruence", "Policy Preference", "Rent Control"), ncol = 1)
+
+# Combine belief and preference plots side-by-side
+p <- plot_grid(beliefs, prefs, ncol = 2, rel_widths = c(1, 1))
+
+# Create a legend for the plot
+legend <- get_legend(fig_effects_by_party(reg2p, range, "", "Policy Preferences", "GMO Ban") + theme(legend.justification = "center",
+                                                                                                       legend.text = element_text(size = 11), legend.title = element_blank(),
+                                                                                                       legend.background = element_rect(colour = 'white'),
+                                                                                                       legend.position = "bottom") +
+                       theme(legend.position = "bottom", legend.justification = 0.5) +
+                       theme(legend.key.width = unit(2, "line")) +
+                       theme(legend.text = element_text(margin = margin(r = 10, l = 10, unit = "pt"))))
+
+# Combine the plot and the legend, and save to a file
+plot_grid(p, legend, nrow = 2, rel_heights = c(7, 1)) 
+
+figure3 <- plot_grid(p, legend, nrow = 2, rel_heights = c(7, 1))
+
+```
+
+# Figure 4
+
+```{r}
+
+# Define a function to generate a plot for belief updating by prior
+fig_belief_updating_by_prior = function(reg,range,ylabel,subtitle,maintitle){
+  # Obtain the coefficients and variance-covariance matrix from the regression model
+  coeffs = as.data.frame(summary(reg)$coefficient)
+  vcov = vcov(reg)
+
+  # Initialize a data frame to store the results
+  results = as.data.frame(matrix(,3,3))
+  colnames(results) = c("mean","se","ci")
+  results$accuracy_3_level = factor(levels(df$accuracy_3_level),levels = levels(df$accuracy_3_level))
+  
+  # Calculate the mean and standard error for each level of pre-treatment accuracy
+  results[,"mean"] <- coeffs[,"Estimate"]
+  results[,"se"] <- coeffs[,"Std. Error"]
+  
+  # Calculate the confidence interval for each level of pre-treatment accuracy
+  results$ci <- results$se * 1.96
+  
+  # Generate the plot
+  p <- ggplot(results, aes(y=mean,x=accuracy_3_level)) +
+    geom_point(stat='identity',size=0.5)+
+    geom_errorbar(aes(ymin = mean - ci,ymax = mean + ci),width = 0.05)+
+    labs(y=ylabel, subtitle=subtitle,title=maintitle, x=  "Pre-treatment Accuracy") +
+    theme(plot.title = element_text(face = 'plain',hjust = 0.5,size=12))+
+    geom_hline(yintercept=0,lty=3)+
+    theme_minimal()+
+    theme(legend.position = "none",axis.title.x = element_blank(),
+          plot.subtitle = element_text(face = "plain",size=9,hjust = 0.5),
+          axis.title.y = element_text(size=8),
+          axis.text.y = element_text(size=8),
+          axis.text.x = element_text(size=8),
+          plot.title = element_text(face = 'bold',hjust = 0.5,size=12))+
+    scale_y_continuous(labels = c("","0%-pts","","30%-pts","","60%-pts"),
+                       limits = range,breaks = c(-0.15,0,0.15,0.3,0.45,0.6))
+  return(p)}
+
+# Do the same for preference updating
+fig_preference_updating_by_prior = function(reg,range,ylabel,subtitle,maintitle){
+  # Similar to above, but for pre-treatment preference
+  coeffs = as.data.frame(summary(reg)$coefficient)
+  vcov = vcov(reg)
+  results = as.data.frame(matrix(,3,3))
+  colnames(results) = c("mean","se","ci")
+  results$preference_3_level = factor(levels(df$preference_3_level),levels = levels(df$preference_3_level))
+  results[,"mean"] <- coeffs[,"Estimate"]
+  results[,"se"] <- coeffs[,"Std. Error"]
+  results$ci <- results$se * 1.96
+  
+  # Generate the plot
+  p <- ggplot(results, aes(y=mean,x=preference_3_level)) +
+    geom_point(stat='identity',size=0.5)+
+    geom_errorbar(aes(ymin = mean - ci,ymax = mean + ci),width = 0.05)+
+    labs(y=ylabel, subtitle=subtitle,title=maintitle, x=  "Pre-treatment Congruence") +
+    theme(plot.title = element_text(face = 'plain',hjust = 0.5,size=12))+
+    geom_hline(yintercept=0,lty=3)+
+    theme_minimal()+
+    theme(legend.position = "none",axis.title.x = element_blank(),
+          plot.subtitle = element_text(face = "plain",size=9,hjust = 0.5),
+          axis.title.y = element_text(size=8),
+          axis.text.y = element_text(size=8),
+          axis.text.x = element_text(size=8),
+          plot.title = element_text(face = 'bold',hjust = 0.5,size=12))+
+    scale_y_continuous(limits = range, breaks = c(-0.05,0,0.05,0.1,0.15,0.2),
+                       labels = c("","0%-pts","","10%-pts","","20%-pts"))
+  return(p)}
+
+# Run separate regression models for each issue and response variable
+reg1b <- lm(accuracy_response ~ accuracy_3_level -1 , d=df[df$survey=="CP18"&df$policymaker==1&df$issue=="Needle Exchange",])
+reg2b <- lm(accuracy_response ~ accuracy_3_level -1, d=df[df$survey=="CP18"&df$policymaker==1&df$issue=="GMO Ban",])
+reg3b <- lm(accuracy_response ~ accuracy_3_level - 1, d=df[df$survey=="CP18"&df$policymaker==1&df$issue=="Rent Control",])
+reg1p <- lm(preference_response ~ preference_3_level -1 , d=df[df$survey=="CP18"&df$policymaker==1&df$issue=="Needle Exchange",])
+reg2p <- lm(preference_response ~ preference_3_level -1, d=df[df$survey=="CP18"&df$policymaker==1&df$issue=="GMO Ban",])
+reg3p <- lm(preference_response ~ preference_3_level - 1, d=df[df$survey=="CP18"&df$policymaker==1&df$issue=="Rent Control",])
+
+# Define the ranges for the y-axis of the plots
+range_b <- c(-.15,.6)
+range_p <- c(-.05,.2)
+
+# Generate the plots for beliefs and preferences
+beliefs = plot_grid(fig_belief_updating_by_prior(reg1b,range_b,"Δ Accuracy","Belief about Experts","Needle Exchange"),
+                    fig_belief_updating_by_prior(reg2b,range_b,"Δ Accuracy","Belief about Experts","GMO Ban"),
+                    fig_belief_updating_by_prior(reg3b,range_b,"Δ Accuracy","Belief about Experts","Rent Control"),ncol=1)
+
+prefs = plot_grid(fig_preference_updating_by_prior(reg1p,range_p,"Δ Congruence","Policy Preference","Needle Exchange"),
+                  fig_preference_updating_by_prior(reg2p,range_p,"Δ Congruence","Policy Preference","GMO Ban"),
+                  fig_preference_updating_by_prior(reg3p,range_p,"Δ Congruence","Policy Preference","Rent Control"),ncol=1)
+
+# Combine the plots for beliefs and preferences into a single grid
+p <- plot_grid(beliefs,prefs,ncol=2,rel_widths  = c(1,1))
+
+# Save the grid of plots to a file
+plot_grid(beliefs,prefs,ncol=2,rel_widths  = c(1,1))+ 
+  ggsave("Figs/fig_updating_by_prior.png",unit = "in",width=7.5, height=6)
+
+figure4 <- plot_grid(beliefs,prefs,ncol=2,rel_widths  = c(1,1))
+
+
+```
+
 
 
