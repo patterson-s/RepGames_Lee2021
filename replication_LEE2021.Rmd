@@ -1,0 +1,224 @@
+---
+title: "replication_LEE2021"
+output: html_document
+date: "2023-06-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Library 
+
+## Issues: 
+The `doStata` package is old and does not appear to be maintained or have much documentation. It also does not load on newer versions of R. 
+
+Is there a better package that is more commonly used? 
+
+```{r Library}
+
+pacman::p_load(statar, doStata, tidyverse, stargazer, scales, cowplot, xtable)
+
+```
+
+# Load data 
+## Issues: PASSING
+```{r}
+#### Read-in ####
+df_original <- read.csv("C:/Users/spatt/Desktop/replicationworkshop/Public_access_datafile_APSR_Lee_2021.csv",stringsAsFactors = F)
+```
+
+
+# Pre-processing
+## Issues: This would benefit from high level annotation (describing the general purpose) and in-context annotation (comments in code). Should avoid droppingin a massive block of code
+
+```{r}
+### Pre-processing, df ####
+df <- df_original %>%
+  # Re-labeling the 'issue' variable and converting it into a factor with specific levels
+  mutate(issue = ifelse(issue=="GMO","GMO Ban",issue),
+         issue = ifelse(issue=="RC","Rent Control",issue),
+         issue = ifelse(issue=="NEP","Needle Exchange",issue),
+         issue = factor(issue,levels = c("Needle Exchange","GMO Ban","Rent Control")),
+
+         # Creating binary versions of the 'preference' and 'policy' variables
+         preference_bin = ifelse(preference>0.5,1,0),
+         policy_bin = ifelse(preference>0.5,1,0),
+
+         # Creating three-level versions of the 'preference' variable
+         preference_3 = ifelse(preference>0.5,1,0),
+         preference_3 = ifelse(preference==0.5,0.5,preference_3),
+         preference_3 = ifelse(preference<0.5,0,preference_3),
+
+         # Creating binary and three-level versions of the 'accuracy' variable
+         accuracy_3 = ifelse(accuracy>0.5,1,0),
+         accuracy_bin = ifelse(accuracy>0.5,1,0),
+         accuracy_3 = ifelse(accuracy==0.5,0.5,accuracy_3),
+         accuracy_3 = ifelse(accuracy<0.5,0,accuracy_3),
+
+         # Recoding 'female' variable into 'gender'
+         gender=  ifelse(female==1,"Women","Men"),
+
+         # Creating age bins based on median age
+         age_bin=  cut(age, breaks= quantile(age,probs = seq(0,1,1/2),na.rm = T),
+                       labels=c("Younger","Older")),
+
+         # Creating government experience bins based on median experience
+         exp_bin=  cut(gov_exp, breaks= quantile(gov_exp,probs = seq(0,1,1/2),na.rm = T),
+                       labels=c("Less experience","More experience")),
+
+         # Creating a polarization variable based on difference between 'republican_alignment' and 'democrat_alignment'
+         polarization = republican_alignment - democrat_alignment,
+
+         # Recoding ideological alignment into 'moderate' and 'conservative' variables
+         moderate = ifelse(ideo5=="Moderate, middle of the road",1,0),
+         conservative = ifelse(ideo5%in%c("Somewhat conservative","Very conservative"),1,0),
+
+         # Recoding political party identification into 'republican' variable
+         republican = ifelse(pid_3=="Republican",1,NA),
+         republican = ifelse(!is.na(pid_indep)&pid_indep=="Republican Party",1,republican),
+         republican = ifelse(pid_3=="Democrat",0,republican),
+         republican = ifelse(!is.na(pid_indep)&pid_indep=="Democratic Party",0,republican),
+
+         # Creating 'republican_alignment' and 'democrat_alignment' variables based on specific statements in 'partisan_diss'
+         republican_alignment <- ifelse(partisan_diss %in% c("Democrats are more likely to support rent control","Democrats are more likely to support a GMO ban","Republicans are more likely to support the use of needle exchanges"),1,0),
+         democrat_alignment <- ifelse(partisan_diss %in% c("Republicans are more likely to support rent control","Republicans are more likely to support a GMO ban","Democrats are more likely to support the use of needle exchanges"),1,0),
+
+         # Recoding 'republican' variable into 'party_bin' factor
+         party_bin = factor(ifelse(republican==1,"Republican","Democrat")),
+
+         # Adding a 'policymaker' variable (presumably to signify that all respondents are policymakers)
+         policymaker = 1,
+
+         # Adding a 'survey' variable (presumably to indicate the survey code)
+         survey = "CP18")
+
+
+# Converting 'familiarity' into numeric and recoding into 'familiarity_3' (three-level) and 'familiarity_bin' (binary) variables
+df$familiarity <- as.numeric(df$familiarity)
+df$familiarity_3 <- ifelse(df$familiarity==1,1,NA)
+df$familiarity_3 <- ifelse(df$familiarity==0.67,0.5,df$familiarity_3)
+df$familiarity_3 <- ifelse(df$familiarity==0.33,0,df$familiarity_3)
+df$familiarity_3 <- ifelse(df$familiarity==0,0,df$familiarity_3)
+df$familiarity_bin <- ifelse(df$familiarity_3==0,0,1)
+
+# Defining levels for 'preference_3' 
+a <- "Least\nCongruent"
+b <- "Somewhat\nCongruent"
+c <- "Most\nCongruent"
+df$preference_3_level <- ifelse(df$preference > 0.5, c,"")
+df$preference_3_level <- ifelse(df$preference == 0.5,b,df$preference_3_level)
+df$preference_3_level <- ifelse(df$preference < 0.5, a,df$preference_3_level)
+df$preference_3_level <- factor(df$preference_3_level, levels = c(a,b,c))
+
+# Defining levels for 'accuracy_3' 
+a <- "Least\nAccurate"
+b <- "Somewhat\nAccurate"
+c <- "Most\nAccurate"
+df$accuracy_3_level <- ifelse(df$accuracy > 0.5, c,"")
+df$accuracy_3_level <- ifelse(df$accuracy == 0.5,b,df$accuracy_3_level)
+df$accuracy_3_level <- ifelse(df$accuracy < 0.5, a,df$accuracy_3_level)
+df$accuracy_3_level <- factor(df$accuracy_3_level, levels = c(a,b,c))
+
+# Creating 'accuracy_posterior' by adding 'accuracy' and 'accuracy_response', and recoding into 'accuracy_response_bin'
+df$accuracy_posterior <- df$accuracy + df$accuracy_response
+df$accuracy_response_bin = ifelse(df$accuracy_posterior>0.5&df$accuracy<0.51,1,NA)
+df$accuracy_response_bin = ifelse(df$accuracy_posterior>0.5&df$accuracy>0.5,0,df$accuracy_response_bin)
+df$accuracy_response_bin = ifelse(df$accuracy_posterior<0.51&df$accuracy<0.51,0,df$accuracy_response_bin)
+df$accuracy_response_bin = ifelse(df$accuracy_posterior<0.51&df$accuracy>0.51,0,df$accuracy_response_bin)
+
+# Creating 'preference_posterior' by adding 'preference' and 'preference_response', and recoding into 'preference_response_bin'
+df$preference_posterior <- df$preference + df$preference_response
+df$preference_response_bin = ifelse(df$preference_posterior>0.5&df$preference<0.51,1,NA)
+df$preference_response_bin = ifelse(df$preference_posterior>0.5&df$preference>0.51,0,df$preference_response_bin)
+df$preference_response_bin = ifelse(df$preference_posterior<0.51&df$preference<0.51,0,df$preference_response_bin)
+df$preference_response_bin = ifelse(df$preference_posterior<0.51&df$preference>0.51,0,df$preference_response_bin)
+
+# ISSUE Creating a binary 'bias_num' variable from 'bias' ----
+## This variable already exists in the submitted dataset as "partisan_bias"
+
+#df$bias_num <- ifelse(df$bias == "Unbiased",1,0)
+
+
+
+# Recoding 'decision_factors_decision_factors_experts' into numeric, ranging from 0 to 1
+df[,"decision_factors_decision_factors_experts"] = ifelse(df[,"decision_factors_decision_factors_experts"]=="Extremely important","1",df[,"decision_factors_decision_factors_experts"])
+df[,"decision_factors_decision_factors_experts"] = ifelse(df[,"decision_factors_decision_factors_experts"]=="Very important","0.75",df[,"decision_factors_decision_factors_experts"])
+df[,"decision_factors_decision_factors_experts"] = ifelse(df[,"decision_factors_decision_factors_experts"]=="Moderately important","0.5",df[,"decision_factors_decision_factors_experts"])
+df[,"decision_factors_decision_factors_experts"] = ifelse(df[,"decision_factors_decision_factors_experts"]=="Slightly important","0.25",df[,"decision_factors_decision_factors_experts"])
+df[,"decision_factors_decision_factors_experts"] = as.numeric(ifelse(df[,"decision_factors_decision_factors_experts"]=="Not at all important","0",df[,"decision_factors_decision_factors_experts"]))
+
+# Creating a 'deference_num' binary variable from 'decision_factors_decision_factors_experts', and recoding it into 'deference' with levels 'High deference' and 'Low deference'
+df$deference_num=ifelse(df$decision_factors_decision_factors_experts>0.25,1,0)
+df$deference =ifelse(df$deference_num == 1,"High deference",NA)
+df$deference =ifelse(df$deference_num == 0,"Low deference",NA)
+
+# Creating a subset of original dataframe where 'treated' equals 0
+panel_control <- df[df$treated==0,]
+
+# Creating a new dataframe 'panel_treated' from 'panel_control' by mutating 'accuracy' and 'preference' to account for response, and setting 'treated' to 1
+panel_treated <- panel_control %>%
+  mutate(accuracy = accuracy + accuracy_response,
+         preference = preference + preference_response,
+         treated=1)
+
+# Combining 'panel_treated' and 'panel_control' to create a stacked dataframe 'panel_stacked' and adding a new column 'method' with value 'Within-\nsubject'
+panel_stacked <- rbind(panel_treated,panel_control)
+panel_stacked$method = "Within-\nsubject"
+
+# Adding a new column 'method' to 'df' with value 'Across-\nsubject'
+df$method = "Across-\nsubject"
+
+# Combining 'df' and 'panel_stacked' into a new dataframe 'combined'
+combined = rbind(df, panel_stacked)
+
+```
+
+
+# Figure 1
+
+```{r}
+
+# Start with the original dataframe
+results <- df %>%
+  # Filter out rows where 'treated' is not 0 and 'policymaker' is not 1
+  filter(treated==0 & policymaker==1) %>%
+  # Mutate 'party_bin' column to character type with "Rep. respondents" where 'republican' equals 1 and "Dem. respondents" otherwise
+  mutate(party_bin = as.character(ifelse(republican == 1,"Rep. respondents","Dem. respondents")),
+         # Convert 'party_bin' to a factor and specify the order of the levels
+         party_bin = factor(party_bin,levels = c("Rep. respondents","Dem. respondents"))) %>%
+  # Select 'policy_bin', 'party_bin', and 'issue' columns
+  select(policy_bin, party_bin, issue) %>%
+  # Filter out rows where 'issue', 'policy_bin', or 'party_bin' is NA
+  filter(!is.na(issue) & !is.na(policy_bin) & !is.na(party_bin)) %>%
+  # Group by 'party_bin' and 'issue'
+  group_by(party_bin, issue) %>%
+  # Summarize 'policy_bin' to calculate mean, standard deviation, and count of non-NA values
+  summarise(mean = mean(policy_bin, na.rm = TRUE),
+            sd   = sd(policy_bin, na.rm = TRUE),
+            n    = sum(!is.na(policy_bin)))
+
+# Calculate standard error (se) and confidence interval (ci)
+results$se = results$sd/sqrt(results$n)
+results$ci = results$se*1.96
+
+
+figure1 <- ggplot(data=results, aes(fill= party_bin, y=mean, x=issue)) +
+  geom_bar(width = 0.5, position='dodge', stat='identity')+
+  geom_errorbar(aes(ymin=mean - ci,ymax=mean + ci), width=0.15, colour="gray48", position = position_dodge(width = 0.5)) +
+  scale_fill_manual(values = c("firebrick","cornflowerblue"),guide=guide_legend(title=NULL))+
+  geom_text(aes(label=mean), position=position_dodge(width=0.9), vjust=5.5, size=4)+
+  theme(plot.title = element_text(hjust = 0.5),legend.position = "none")+
+  xlab('')+ 
+  ylab('')+
+  ggtitle("")+
+  scale_y_continuous(labels = percent) +
+  scale_x_discrete(labels = c("Support\nNeedle Exchange","Oppose\nGMO Ban","Oppose\nRent Control"))+
+  theme(legend.position = "right") + 
+  theme_minimal()
+
+```
+
+
+
